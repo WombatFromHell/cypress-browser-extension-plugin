@@ -54,24 +54,36 @@ function copyHookFile(templateFile, destDir, fileName, alias) {
 
 async function buildFiles(opts) {
   const stat = await fs.stat(opts.source);
-  if (!opts.quiet) console.log(`Cypress Extensions: ${stat.isDirectory() ? 'Copying' : 'Unpacking'} and preparing extension ${opts.alias} from ${opts.source} to ${opts.destDir}`);
+  if (!opts.quiet) {
+    console.log(
+      `Cypress Extensions: ${stat.isDirectory() ? 'Copying' : 'Unpacking'} and preparing extension ${opts.alias} from ${
+        opts.source
+      } to ${opts.destDir}`,
+    );
+  }
 
   // Copy ext to tmp dir
   await fs.remove(opts.destDir);
   if (stat.isDirectory()) {
     await fs.copy(opts.source, opts.destDir);
-  } else { // assume crx
+  } else {
+    // assume crx
     await unzipCrx(opts.source, opts.destDir);
   }
-  await fs.mkdir(path.join(opts.destDir, hookFilesDir));
+
+  try {
+    await fs.mkdir(path.join(opts.destDir, hookFilesDir));
+  } catch (err) {
+    // eat EEXIST errors
+    if (err.code !== 'EEXIST') throw err;
+  }
 
   // Update manifest
   const manifest = await fs.readJson(path.join(opts.destDir, 'manifest.json'));
   // Allow extension content scripts in all non-Cypress frames
   const cs = manifest.content_scripts;
-  manifest.content_scripts = cs && cs.map(scriptObj => (
-    merge(scriptObj, { all_frames: true, exclude_matches: opts.cypressMatches })
-  ));
+  manifest.content_scripts =
+    cs && cs.map(scriptObj => merge(scriptObj, { all_frames: true, exclude_matches: opts.cypressMatches }));
 
   // Inject hooks
   if (!opts.skipHooks) {
@@ -109,7 +121,9 @@ function watch(opts) {
   if (!opts.watch) return opts;
   const watcher = chokidar.watch(opts.source, { ignoreInitial: true });
   watcher.on('all', (event, changePath) => {
-    if (!opts.quiet) console.log('Cypress Extensions: Watch event ', event, ` on ${opts.alias}:`, changePath);
+    if (!opts.quiet) {
+      console.log('Cypress Extensions: Watch event ', event, ` on ${opts.alias}:`, changePath);
+    }
     buildFiles(opts);
   });
   watchers.push(watcher);
@@ -146,20 +160,17 @@ const whenAllBuilt = () => Promise.all(buildPromises);
 // for use in the on('before:browser:launch') Cypress hook
 // returns a promise resolving to the browser args once all the tempextensions are built
 function onBeforeBrowserLaunch(browser = {}, config) {
-
   // In Cypress v3, second argument is `args` array
   // In Cypress v4, second argument is `launchOptions` object with `args` array in it
-  const args = Array.isArray(config) ? config : config.args
+  const args = Array.isArray(config) ? config : config.args;
 
   return whenAllBuilt().then(() => {
-    const toLoad = definitions.filter(opts => (
-      !opts.validBrowsers || opts.validBrowsers.includes(browser.name)
-    ));
+    const toLoad = definitions.filter(opts => !opts.validBrowsers || opts.validBrowsers.includes(browser.name));
     if (toLoad.length > 0) {
       const dirList = toLoad.map(o => o.destDir).join(',');
-      const existingLoadArgIndex = args.findIndex(arg => (
-        (typeof arg === 'string') && arg.startsWith('--load-extension=')
-      ));
+      const existingLoadArgIndex = args.findIndex(
+        arg => typeof arg === 'string' && arg.startsWith('--load-extension='),
+      );
       if (existingLoadArgIndex >= 0) {
         // eslint-disable-next-line no-param-reassign
         args[existingLoadArgIndex] = `${args[existingLoadArgIndex]},${dirList}`;

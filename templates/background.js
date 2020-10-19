@@ -23,12 +23,6 @@ function logPromiseResult(promise) {
   );
 }
 
-function addPromisifiedCb(args, resolve, reject) {
-  return (args || []).concat(val => (
-    (chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve(val))
-  ));
-}
-
 // calls method on (given property of) the browser API object and returns a promise
 // since it can't know in advance if the method has a sync return, a promise or a callback,
 // this relies on the message.returnType passed by the caller (set to 'callback' if cb)
@@ -40,7 +34,8 @@ function executeBrowserCommand(message) {
     if (!method) { // always sync if just accessing property (no method)
       resolve(target);
     } else if (returnType === 'callback') {
-      target[method].apply(target, addPromisifiedCb(args, resolve, reject));
+      const result = target[method].apply(target, args);
+      return chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve(result);
     } else { // returnType sync or promise
       try {
         const res = target[message].apply(target, args);

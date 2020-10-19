@@ -1,15 +1,18 @@
 {
-    "extends": "airbnb-base",
-    "rules": {
-        "prefer-arrow-callback": [ "error", { "allowNamedFunctions": true } ],
-        "no-console": "off",
-        "object-curly-newline": [ "error", { "ObjectPattern": { "multiline": true } } ],
-        "function-paren-newline": [ "error", "consistent" ]
-    },
-    "plugins": [
-        "cypress"
-    ],
-    "env": {
-        "cypress/globals": true
-    }
+  "env": {
+    "cypress/globals": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 8,
+    "sourceType": "module"
+  },
+  "extends": ["eslint:recommended", "airbnb-base"],
+  "rules": {
+    "prefer-arrow-callback": ["error", { "allowNamedFunctions": true }],
+    "no-console": "off",
+    "object-curly-newline": ["error", { "ObjectPattern": { "multiline": true } }],
+    "function-paren-newline": ["error", { "minItems": 3 }]
+  },
+  "plugins": ["cypress"],
 }
